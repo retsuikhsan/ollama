@@ -143,12 +143,22 @@ func (t *Template) Vars() []string {
 
 type Values struct {
 	Messages []api.Message
+	Prompt   string
+	Suffix   string
 
 	// forceLegacy is a flag used to test compatibility with legacy templates
 	forceLegacy bool
 }
 
 func (t *Template) Execute(w io.Writer, v Values) error {
+	if v.Prompt != "" && v.Suffix != "" {
+		return t.Template.Execute(w, map[string]any{
+			"Prompt":   v.Prompt,
+			"Suffix":   v.Suffix,
+			"Response": "",
+		})
+	}
+
 	system, collated := collate(v.Messages)
 	if !v.forceLegacy && slices.Contains(t.Vars(), "messages") {
 		return t.Template.Execute(w, map[string]any{
