@@ -245,7 +245,16 @@ func fromEmbeddingRequest(r EmbeddingRequest) api.EmbeddingRequest {
 	}
 }
 
-func fromRequest(r ChatCompletionRequest) api.ChatRequest {
+func toModel(r api.ShowResponse, m string) Model {
+	return Model{
+		Id:      m,
+		Object:  "model",
+		Created: r.ModifiedAt.Unix(),
+		OwnedBy: model.ParseName(m).Namespace,
+	}
+}
+
+func fromChatRequest(r ChatCompletionRequest) api.ChatRequest {
 	var messages []api.Message
 	for _, msg := range r.Messages {
 		messages = append(messages, api.Message{Role: msg.Role, Content: msg.Content})
@@ -417,15 +426,18 @@ func (w *ListWriter) Write(data []byte) (int, error) {
 	return w.writeResponse(data)
 }
 
+
 func (w *EmbeddingWriter) writeResponse(data []byte) (int, error) {
 	var embeddingResponse api.EmbeddingResponse
 	err := json.Unmarshal(data, &embeddingResponse)
+
 	if err != nil {
 		return 0, err
 	}
 
 	w.ResponseWriter.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(w.ResponseWriter).Encode(toEmbeddingCompletion(w.model, embeddingResponse))
+
 	if err != nil {
 		return 0, err
 	}
@@ -482,7 +494,8 @@ func EmbeddingMiddleware() gin.HandlerFunc {
 	}
 }
 
-func Middleware() gin.HandlerFunc {
+
+func ChatMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req ChatCompletionRequest
 		err := c.ShouldBindJSON(&req)
@@ -497,7 +510,7 @@ func Middleware() gin.HandlerFunc {
 		}
 
 		var b bytes.Buffer
-		if err := json.NewEncoder(&b).Encode(fromRequest(req)); err != nil {
+		if err := json.NewEncoder(&b).Encode(fromChatRequest(req)); err != nil {
 			c.AbortWithStatusJSON(http.StatusInternalServerError, NewError(http.StatusInternalServerError, err.Error()))
 			return
 		}
