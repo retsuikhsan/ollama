@@ -331,6 +331,11 @@ type ListWriter struct {
 	BaseWriter
 }
 
+type RetrieveWriter struct {
+	BaseWriter
+	model string
+}
+
 type EmbeddingWriter struct {
 	BaseWriter
 	model string
@@ -426,6 +431,31 @@ func (w *ListWriter) Write(data []byte) (int, error) {
 	return w.writeResponse(data)
 }
 
+func (w *RetrieveWriter) writeResponse(data []byte) (int, error) {
+	var showResponse api.ShowResponse
+	err := json.Unmarshal(data, &showResponse)
+	if err != nil {
+		return 0, err
+	}
+
+	// retrieve completion
+	w.ResponseWriter.Header().Set("Content-Type", "application/json")
+	err = json.NewEncoder(w.ResponseWriter).Encode(toModel(showResponse, w.model))
+	if err != nil {
+		return 0, err
+	}
+
+	return len(data), nil
+}
+
+func (w *RetrieveWriter) Write(data []byte) (int, error) {
+	code := w.ResponseWriter.Status()
+	if code != http.StatusOK {
+		return w.writeError(code, data)
+	}
+
+	return w.writeResponse(data)
+}
 
 func (w *EmbeddingWriter) writeResponse(data []byte) (int, error) {
 	var embeddingResponse api.EmbeddingResponse
@@ -466,6 +496,28 @@ func ListMiddleware() gin.HandlerFunc {
 	}
 }
 
+func RetrieveMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var b bytes.Buffer
+		if err := json.NewEncoder(&b).Encode(api.ShowRequest{Name: c.Param("model")}); err != nil {
+			c.AbortWithStatusJSON(http.StatusInternalServerError, NewError(http.StatusInternalServerError, err.Error()))
+			return
+		}
+
+		c.Request.Body = io.NopCloser(&b)
+
+		// response writer
+		w := &RetrieveWriter{
+			BaseWriter: BaseWriter{ResponseWriter: c.Writer},
+			model:      c.Param("model"),
+		}
+
+		c.Writer = w
+
+		c.Next()
+	}
+}
+
 func EmbeddingMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req EmbeddingRequest
@@ -493,7 +545,6 @@ func EmbeddingMiddleware() gin.HandlerFunc {
 		c.Next()
 	}
 }
-
 
 func ChatMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
