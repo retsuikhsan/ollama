@@ -59,7 +59,7 @@ type ResponseFormat struct {
 	Type string `json:"type"`
 }
 
-type EmbeddingRequest struct {
+type EmbedRequest struct {
 	Input any    `json:"input"`
 	Model string `json:"model"`
 }
@@ -139,7 +139,7 @@ type Model struct {
 
 type Embedding struct {
 	Object    string    `json:"object"`
-	Embedding []float64 `json:"embedding"`
+	Embedding []float32 `json:"embedding"`
 	Index     int       `json:"index"`
 }
 
@@ -152,7 +152,6 @@ type EmbeddingList struct {
 	Object string      `json:"object"`
 	Data   []Embedding `json:"data"`
 	Model  string      `json:"model"`
-	// Usage  Usage       `json:"usage,omitempty"`
 }
 
 func NewError(code int, message string) ErrorResponse {
@@ -278,22 +277,10 @@ func toListCompletion(r api.ListResponse) ListCompletion {
 	}
 }
 
-func toEmbeddingCompletion(model string, r api.EmbeddingResponse) EmbeddingList {
-	if r.Embedding != nil {
-		return EmbeddingList{
-			Object: "list",
-			Data: []Embedding{{
-				Object:    "embedding",
-				Embedding: r.Embedding,
-				Index:     0,
-			}},
-			Model: model,
-		}
-	}
-
-	if r.EmbeddingBatch != nil {
+func toEmbedCompletion(model string, r api.EmbedResponse) EmbeddingList {
+	if r.Embeddings != nil {
 		var data []Embedding
-		for i, e := range r.EmbeddingBatch {
+		for i, e := range r.Embeddings {
 			data = append(data, Embedding{
 				Object:    "embedding",
 				Embedding: e,
@@ -308,26 +295,7 @@ func toEmbeddingCompletion(model string, r api.EmbeddingResponse) EmbeddingList 
 		}
 	}
 
-	// return error
 	return EmbeddingList{}
-}
-
-func fromEmbeddingRequest(r EmbeddingRequest) api.EmbeddingRequest {
-	switch input := r.Input.(type) {
-	case string:
-		return api.EmbeddingRequest{
-			Model:  r.Model,
-			Prompt: input,
-		}
-	case []string:
-		return api.EmbeddingRequest{
-			Model:       r.Model,
-			PromptBatch: input,
-		}
-	default:
-		// return error
-		return api.EmbeddingRequest{}
-	}
 }
 
 func toModel(r api.ShowResponse, m string) Model {
@@ -473,7 +441,7 @@ type RetrieveWriter struct {
 	model string
 }
 
-type EmbeddingWriter struct {
+type EmbedWriter struct {
 	BaseWriter
 	model string
 }
@@ -643,16 +611,16 @@ func (w *RetrieveWriter) Write(data []byte) (int, error) {
 	return w.writeResponse(data)
 }
 
-func (w *EmbeddingWriter) writeResponse(data []byte) (int, error) {
-	var embeddingResponse api.EmbeddingResponse
-	err := json.Unmarshal(data, &embeddingResponse)
+func (w *EmbedWriter) writeResponse(data []byte) (int, error) {
+	var embedResponse api.EmbedResponse
+	err := json.Unmarshal(data, &embedResponse)
 
 	if err != nil {
 		return 0, err
 	}
 
 	w.ResponseWriter.Header().Set("Content-Type", "application/json")
-	err = json.NewEncoder(w.ResponseWriter).Encode(toEmbeddingCompletion(w.model, embeddingResponse))
+	err = json.NewEncoder(w.ResponseWriter).Encode(toEmbedCompletion(w.model, embedResponse))
 
 	if err != nil {
 		return 0, err
@@ -661,7 +629,7 @@ func (w *EmbeddingWriter) writeResponse(data []byte) (int, error) {
 	return len(data), nil
 }
 
-func (w *EmbeddingWriter) Write(data []byte) (int, error) {
+func (w *EmbedWriter) Write(data []byte) (int, error) {
 	code := w.ResponseWriter.Status()
 	if code != http.StatusOK {
 		return w.writeError(code, data)
@@ -704,9 +672,9 @@ func RetrieveMiddleware() gin.HandlerFunc {
 	}
 }
 
-func EmbeddingMiddleware() gin.HandlerFunc {
+func EmbedMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var req EmbeddingRequest
+		var req EmbedRequest
 		err := c.ShouldBindJSON(&req)
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusBadRequest, NewError(http.StatusBadRequest, err.Error()))
@@ -714,14 +682,14 @@ func EmbeddingMiddleware() gin.HandlerFunc {
 		}
 
 		var b bytes.Buffer
-		if err := json.NewEncoder(&b).Encode(fromEmbeddingRequest(req)); err != nil {
+		if err := json.NewEncoder(&b).Encode(api.EmbedRequest{Model: req.Model, Input: req.Input}); err != nil {
 			c.AbortWithStatusJSON(http.StatusInternalServerError, NewError(http.StatusInternalServerError, err.Error()))
 			return
 		}
 
 		c.Request.Body = io.NopCloser(&b)
 
-		w := &EmbeddingWriter{
+		w := &EmbedWriter{
 			BaseWriter: BaseWriter{ResponseWriter: c.Writer},
 			model:      req.Model,
 		}

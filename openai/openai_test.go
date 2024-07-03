@@ -252,14 +252,15 @@ func TestMiddleware(t *testing.T) {
 			Method:   http.MethodPost,
 			Path:     "/api/embeddings",
 			TestPath: "/api/embeddings",
-			Handler:  EmbeddingMiddleware,
+			Handler:  EmbedMiddleware,
 			Endpoint: func(c *gin.Context) {
-				c.JSON(http.StatusOK, api.EmbeddingResponse{
-					Embedding: []float64{0.1, 0.2, 0.3},
+				c.JSON(http.StatusOK, api.EmbedResponse{
+					Model:      "test-model",
+					Embeddings: [][]float32{{0.1, 0.2, 0.3}},
 				})
 			},
 			Setup: func(t *testing.T, req *http.Request) {
-				body := EmbeddingRequest{
+				body := EmbedRequest{
 					Input: "Hello",
 					Model: "test-model",
 				}
@@ -299,12 +300,13 @@ func TestMiddleware(t *testing.T) {
 		{
 			Name:     "embedding handler (batch embedding)",
 			Method:   http.MethodPost,
-			Path:     "/api/embeddings",
-			TestPath: "/api/embeddings",
-			Handler:  EmbeddingMiddleware,
+			Path:     "/api/embed",
+			TestPath: "/api/embed",
+			Handler:  EmbedMiddleware,
 			Endpoint: func(c *gin.Context) {
-				c.JSON(http.StatusOK, api.EmbeddingResponse{
-					EmbeddingBatch: [][]float64{
+				c.JSON(http.StatusOK, api.EmbedResponse{
+					Model: "test-model",
+					Embeddings: [][]float64{
 						{0.1, 0.2, 0.3},
 						{0.4, 0.5, 0.6},
 						{0.7, 0.8, 0.9},
@@ -312,7 +314,7 @@ func TestMiddleware(t *testing.T) {
 				})
 			},
 			Setup: func(t *testing.T, req *http.Request) {
-				body := EmbeddingRequest{
+				body := EmbedRequest{
 					Input: []string{"Hello", "World", "Ollama"},
 					Model: "test-model",
 				}
@@ -346,10 +348,10 @@ func TestMiddleware(t *testing.T) {
 
 				if embeddingResp.Model != "test-model" {
 					t.Fatalf("expected test-model, got %s", embeddingResp.Model)
-        }
-      },
-    },
-    {
+				}
+			},
+		},
+		{
 			Name:     "retrieve model",
 			Method:   http.MethodGet,
 			Path:     "/api/show/:model",
