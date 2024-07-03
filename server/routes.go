@@ -176,11 +176,7 @@ func (s *Server) GenerateHandler(c *gin.Context) {
 		prompt = req.Prompt
 	case req.Prompt != "":
 		if req.Template == "" {
-			model.Template, err = template.Parse(req.Template)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-				return
-			}
+			tmpl = model.Template
 		}
 
 		if req.System == "" {
@@ -1054,7 +1050,8 @@ func (s *Server) GenerateRoutes() http.Handler {
 
 	// Compatibility endpoints
 	r.POST("/v1/chat/completions", openai.ChatMiddleware(), s.ChatHandler)
-	r.POST("/v1/embeddings", openai.EmbeddingMiddleware(), s.EmbeddingsHandler)
+	r.POST("/v1/completions", openai.CompletionsMiddleware(), s.GenerateHandler)
+  r.POST("/v1/embeddings", openai.EmbeddingMiddleware(), s.EmbeddingsHandler)
 	r.GET("/v1/models", openai.ListMiddleware(), s.ListModelsHandler)
 	r.GET("/v1/models/:model", openai.RetrieveMiddleware(), s.ShowModelHandler)
 
