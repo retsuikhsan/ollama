@@ -545,9 +545,10 @@ func TestCreateDetectTemplate(t *testing.T) {
 		}
 
 		checkFileExists(t, filepath.Join(p, "blobs", "*"), []string{
+			filepath.Join(p, "blobs", "sha256-0d79f567714c62c048378f2107fb332dabee0135d080c302d884317da9433cc5"),
 			filepath.Join(p, "blobs", "sha256-553c4a3f747b3d22a4946875f1cc8ed011c2930d83f864a0c7265f9ec0a20413"),
 			filepath.Join(p, "blobs", "sha256-68b0323b2f21572bc09ba07554b16b379a5713ee48ef8c25a7661a1f71cfce77"),
-			filepath.Join(p, "blobs", "sha256-eb72fb7c550ee1f1dec4039bd65382acecf5f7536a30fb7ccace39a8d0cb590b"),
+			filepath.Join(p, "blobs", "sha256-ae00a014fcbff873746ea1e58aa6b9a092723516d34c49733240a7bab7f1a5f3"),
 		})
 	})
 
