@@ -198,11 +198,13 @@ func (s *Scheduler) processPending(ctx context.Context) {
 
 					// Add available GPU memory to the total pool
 					// macOS hardware has unified memory so don't double count
+					hasGpu := false
 					if runtime.GOOS != "darwin" {
 						for _, gpu := range gpus {
 							if gpu.Library == "cpu" {
 								continue
 							}
+							hasGpu = true
 							if loadedCount == 0 {
 								// If no other models are loaded, set the limit based on what's available
 								maxSize += gpu.FreeMemory
@@ -219,7 +221,7 @@ func (s *Scheduler) processPending(ctx context.Context) {
 
 						// Linux will crash if over-allocating memory - return an error to the user.
 						// TODO (jmorganca): add reasonable upper limits for darwin and windows as well
-						if runtime.GOOS == "linux" {
+						if runtime.GOOS == "linux" && hasGpu {
 							pending.errCh <- fmt.Errorf("requested model (%s) is too large for this system (%s)", format.HumanBytes2(estimate.TotalSize), format.HumanBytes2(maxSize))
 							break
 						}
